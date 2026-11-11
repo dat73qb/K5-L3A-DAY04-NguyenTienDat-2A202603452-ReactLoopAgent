@@ -5,35 +5,65 @@ import json
 import os
 from pathlib import Path
 import sys
+import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from agent import run_agent
+from env_loader import load_env_file
 from providers import Provider
 from scenarios import ScenarioTools
 from grading import grade_case, summarize, bonus_points
 from bonus.tools import BonusTools
 
 
+def _retry_on_429(fn, max_retries=5, base_delay=2.0, label=''):
+    """Thực thi fn với retry exponential backoff khi gặp 429 hoặc timeout tạm thời."""
+    last_exc = None
+    for attempt in range(max_retries):
+        try:
+            return fn()
+        except RuntimeError as exc:
+            msg = str(exc)
+            transient = 'HTTP 429' in msg or 'timed out' in msg.lower() or 'timeout' in msg.lower()
+            if transient:
+                last_exc = exc
+                delay = base_delay * (2 ** attempt)
+                print(f'  [{label}] lỗi tạm thời ({msg[:60]}), thử lại sau {delay:.0f}s (lần {attempt+1}/{max_retries})', flush=True)
+                time.sleep(delay)
+                continue
+            raise
+    raise last_exc
+
+
 def run_case(case, args):
+    label = case["id"]
     try:
-        result = run_agent(case['question'], Provider(args.provider, args.model),
-                           (BonusTools('snapshot', scenario=case.get('scenario', 'normal')) if getattr(args, 'bonus', False) else ScenarioTools(case.get('scenario', 'normal'), case.get('fail', False))), max_steps=args.max_steps)
+        result = _retry_on_429(
+            lambda: run_agent(case["question"], Provider(args.provider, args.model),
+                              (BonusTools("snapshot", scenario=case.get("scenario", "normal")) if getattr(args, "bonus", False) else ScenarioTools(case.get("scenario", "normal"), case.get("fail", False))), max_steps=args.max_steps),
+            label=label,
+        )
     except Exception as exc:
-        result = {'status': 'error', 'answer': '', 'trace': [], 'usage': [], 'error': f'{type(exc).__name__}: {str(exc)[:200]}'}
-    if not isinstance(result, dict) or not isinstance(result.get('trace', []), list):
-        result = {'status': 'error', 'answer': '', 'trace': [], 'usage': [], 'error': 'run_agent trả kết quả không hợp lệ.'}
+        err_msg = type(exc).__name__ + ": " + str(exc)[:200]
+        result = {"status": "error", "answer": "", "trace": [], "usage": [], "error": err_msg}
+    if not isinstance(result, dict) or not isinstance(result.get("trace", []), list):
+        result = {"status": "error", "answer": "", "trace": [], "usage": [], "error": "run_agent tra ket qua khong hop le."}
     try:
         judge = Provider(args.judge_provider, args.judge_model)
-        grade = grade_case(case, result, judge)
+        grade = _retry_on_429(
+            lambda: grade_case(case, result, judge),
+            label=label,
+        )
     except Exception as exc:
-        grade = {'score': None, 'status': 'unscored', 'reason': str(exc), 'judge_usage': {}}
+        err_msg = str(exc)
+        grade = {"score": None, "status": "unscored", "reason": err_msg, "judge_usage": {}}
     return {'id': case['id'], 'question': case['question'], 'expected': case['expected'],
             'scenario': case.get('scenario', 'normal'), 'provider': args.provider, 'model': args.model,
             'judge_provider': args.judge_provider, 'judge_model': args.judge_model, 'result': result, 'grade': grade}
 
-
 def main():
+    load_env_file()
     parser = argparse.ArgumentParser(description='Chạy agent và chấm eval 0–100')
-    choices = ['openai', 'gemini', 'anthropic', 'openrouter']
+    choices = ['openai', 'gemini', 'anthropic', 'openrouter', 'opencode']
     parser.add_argument('--provider', choices=choices, default=os.getenv('PROVIDER', 'openai'))
     parser.add_argument('--model', default=os.getenv('MODEL'))
     parser.add_argument('--judge-provider', choices=choices, default=os.getenv('JUDGE_PROVIDER'))

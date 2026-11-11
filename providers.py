@@ -3,12 +3,14 @@ import json
 import os
 import urllib.error
 import urllib.request
+import uuid
 
 CONFIG = {
     'openai': ('OPENAI_API_KEY', 'https://api.openai.com/v1/chat/completions'),
     'gemini': ('GEMINI_API_KEY', 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'),
     'openrouter': ('OPENROUTER_API_KEY', 'https://openrouter.ai/api/v1/chat/completions'),
     'anthropic': ('ANTHROPIC_API_KEY', 'https://api.anthropic.com/v1/messages'),
+    'opencode': ('API_KEY', 'https://opencode.ai/inference/go/openai/v1/chat/completions'),
 }
 
 
@@ -40,6 +42,15 @@ class Provider:
         self.key = os.getenv(key_name)
         if not self.key:
             raise ValueError(f'Thiếu {key_name}; xem README.md.')
+        self.session_id = f'status-agent-{uuid.uuid4()}'
+
+    def _headers(self):
+        headers = {'Authorization': f'Bearer {self.key}'}
+        if self.name == 'opencode':
+            # Go endpoint dùng header này để routing/prompt caching ổn định.
+            headers['x-opencode-session'] = self.session_id
+            headers['User-Agent'] = 'status-agent/1.0'
+        return headers
 
     def complete(self, messages, schemas):
         if self.name == 'anthropic':
@@ -47,7 +58,7 @@ class Provider:
         payload = {'model': self.model, 'messages': messages}
         if schemas:
             payload['tools'] = schemas
-        data = post_json(self.url, {'Authorization': f'Bearer {self.key}'}, payload)
+        data = post_json(self.url, self._headers(), payload)
         choice = data['choices'][0]
         message = choice['message']
         calls = [{'id': c['id'], 'name': c['function']['name'], 'arguments': c['function']['arguments']} for c in message.get('tool_calls', [])]

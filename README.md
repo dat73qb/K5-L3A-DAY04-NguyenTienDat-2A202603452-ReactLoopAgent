@@ -42,7 +42,7 @@ Sau bài chính, bạn có thể mở rộng agent để điều tra **GitHub, C
 
 ## 1. Chuẩn bị
 
-- Python **3.10+**, có Internet và API key của **một** trong bốn provider.
+- Python **3.10+**, có Internet và API key của **một** trong năm provider.
 - Chọn model có hỗ trợ **tool calling**. API provider/model có thể phát sinh chi phí.
 - Không cần cài package: project dùng Python standard library.
 
@@ -63,10 +63,11 @@ Chọn cấu hình khác nếu cần:
 | `gemini` | `GEMINI_API_KEY` | Tên model Gemini hỗ trợ function calling. |
 | `anthropic` | `ANTHROPIC_API_KEY` | Tên model Claude hỗ trợ tool use. |
 | `openrouter` | `OPENROUTER_API_KEY` | Model ID đầy đủ trên OpenRouter, thường có dạng provider/model. |
+| `opencode` | `API_KEY` | Model ID của OpenCode Go/Console, ví dụ `deepseek-v4.1-flash`. |
 
-Ví dụ chuyển sang Gemini: `export PROVIDER=gemini`, đặt `GEMINI_API_KEY` và `MODEL` phù hợp. Chọn một provider; không cần cả bốn key. File `.env.example` chỉ là mẫu: chương trình **không tự đọc `.env`**. Có thể chạy `cp .env.example .env`, điền key rồi chạy `source .env` trong mỗi terminal mới. Trên Windows, dùng Git Bash để chạy đúng các lệnh này, hoặc thay `python3` bằng `python` và đặt biến bằng `$env:TEN_BIEN='gia_tri'` trong PowerShell. Không commit key hay trace chứa dữ liệu nhạy cảm.
+Ví dụ chuyển sang OpenCode: `export PROVIDER=opencode`, `export API_KEY='<opencode-api-key>'`, `export MODEL=deepseek-v4.1-flash` (model phải có trong gói Go/Console của bạn). Ví dụ chuyển sang Gemini: `export PROVIDER=gemini`, đặt `GEMINI_API_KEY` và `MODEL` phù hợp. Chọn một provider; không cần tất cả key. File `.env` ở thư mục dự án được tự động đọc khi chạy `run.py`/`evals/run_evals.py` (biến đã đặt trong shell được ưu tiên, không bị ghi đè). Có thể chạy `cp .env.example .env` rồi điền key; hoặc `source .env` trong mỗi terminal mới. Trên Windows, dùng Git Bash để chạy đúng các lệnh này, hoặc thay `python3` bằng `python` và đặt biến bằng `$env:TEN_BIEN='gia_tri'` trong PowerShell. Không commit key hay trace chứa dữ liệu nhạy cảm.
 
-Adapter dùng Chat Completions cho OpenAI, Gemini compatibility và OpenRouter; Anthropic dùng Messages API. Nó phục vụ **tool calling cơ bản**, không bao phủ mọi tính năng đặc thù model như extended thinking. Khi provider từ chối model hoặc hết quota, kiểm tra quyền truy cập, model ID và key. Xem tài liệu: [OpenAI](https://developers.openai.com/api/docs/guides/function-calling), [Gemini](https://ai.google.dev/gemini-api/docs/openai), [Anthropic](https://platform.claude.com/docs/en/agents-and-tools/tool-use/how-tool-use-works), [OpenRouter](https://openrouter.ai/docs/guides/features/tool-calling).
+Adapter dùng Chat Completions cho OpenAI, Gemini compatibility, OpenRouter và OpenCode (Go endpoint); Anthropic dùng Messages API. Nó phục vụ **tool calling cơ bản**, không bao phủ mọi tính năng đặc thù model như extended thinking. Khi provider từ chối model hoặc hết quota, kiểm tra quyền truy cập, model ID và key. Xem tài liệu: [OpenAI](https://developers.openai.com/api/docs/guides/function-calling), [Gemini](https://ai.google.dev/gemini-api/docs/openai), [Anthropic](https://platform.claude.com/docs/en/agents-and-tools/tool-use/how-tool-use-works), [OpenRouter](https://openrouter.ai/docs/guides/features/tool-calling).
 
 ## 2. Chạy thử
 
